@@ -19,6 +19,8 @@ memset(&(a), 0, sizeof(a)); \
 #define EGL_RENDER_INPUT_PORT	220
 #define EGL_RENDER_OUTPUT_PORT	221
 #define CAMERA_OUTPUT_PORT		71
+#define SPLITTER_INPUT_PORT		250
+#define SPLITTER_OUTPUT_PORT	251
 
 string ofxOMXVideoGrabber::LOG_NAME = "ofxOMXVideoGrabber";
 
@@ -141,6 +143,65 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 		ofLog(OF_LOG_ERROR,			"camera OMX_SetConfig OMX_IndexConfigVideoFramerate FAIL error: 0x%08x", error);
 	}
 	
+	
+	//SPLITTER
+	string splitterComponentName = "OMX.broadcom.video_splitter";
+	OMX_CALLBACKTYPE splitterCallbacks;
+	splitterCallbacks.EventHandler    = &ofxOMXVideoGrabber::splitterEventHandlerCallback;
+	
+	error = OMX_GetHandle(&splitter, (OMX_STRING)splitterComponentName.c_str(), this , &splitterCallbacks);
+	if(error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"splitter OMX_GetHandle PASS";
+	}else
+	{
+		ofLog(OF_LOG_ERROR,			"splitter OMX_GetHandle FAIL error: 0x%08x", error);
+	}
+	didDisable = disableAllPortsForComponent(&splitter);
+	if(didDisable == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"splitter didDisable PASS";
+	}else 
+	{
+		ofLog(OF_LOG_ERROR,			"splitter didDisable FAIL error: 0x%08x", didDisable);
+	}
+	//Set the resolution
+	OMX_PARAM_PORTDEFINITIONTYPE splitterPortdef;
+	OMX_INIT_STRUCTURE(splitterPortdef);
+	splitterPortdef.nPortIndex = SPLITTER_INPUT_PORT;
+	
+	
+	error = OMX_GetParameter(splitter, OMX_IndexParamPortDefinition, &splitterPortdef);
+	if(error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"splitter OMX_GetParameter OMX_IndexParamPortDefinition PASS";
+	}else
+	{
+		ofLog(OF_LOG_ERROR,			"splitter OMX_GetParameter OMX_IndexParamPortDefinition FAIL error: 0x%08x", error);
+	}
+	splitterPortdef.format.image.nFrameWidth = videoWidth;
+	splitterPortdef.format.image.nFrameHeight = videoHeight;
+	splitterPortdef.format.image.nStride = videoWidth;
+	
+	error = OMX_SetParameter(splitter, OMX_IndexParamPortDefinition, &splitterPortdef);
+	if(error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"splitter OMX_SetParameter OMX_IndexParamPortDefinition PASS";
+	}else
+	{
+		ofLog(OF_LOG_ERROR,			"splitter OMX_SetParameter OMX_IndexParamPortDefinition FAIL error: 0x%08x", error);
+	}
+	error = OMX_SendCommand(splitter, OMX_CommandStateSet, OMX_StateIdle, NULL);
+	if (error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"splitter OMX_SendCommand OMX_StateIdle PASS";
+	}else 
+	{
+		ofLog(OF_LOG_ERROR,			"splitter OMX_SendCommand OMX_StateIdle FAIL error: 0x%08x", error);
+	}
+	
+	
+	
 	setExposureMode(OMX_ExposureControlAuto);
 	setMeteringMode(OMX_MeteringModeAverage);
 	setSharpness(-50);
@@ -152,6 +213,9 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 	applyImageFilter(OMX_ImageFilterNone);
 	setColorEnhancement(false);	 
 	setLEDStatus(false);
+	
+	
+
 }
 
 void ofxOMXVideoGrabber::setExposureMode(OMX_EXPOSURECONTROLTYPE exposureMode)
@@ -509,6 +573,35 @@ void ofxOMXVideoGrabber::generateEGLImage()
 		ofLogVerbose(LOG_NAME)	<< "Create EGLImage PASS";
 	}
 }
+OMX_ERRORTYPE ofxOMXVideoGrabber::splitterEventHandlerCallback(OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData)
+{
+	ofLog(OF_LOG_VERBOSE, 
+		  "ofxOMXVideoGrabber::%s - eEvent(0x%x), nData1(0x%lx), nData2(0x%lx), pEventData(0x%p)\n",
+		  __func__, eEvent, nData1, nData2, pEventData);
+	switch (eEvent) 
+	{
+		case OMX_EventCmdComplete:					ofLogVerbose(LOG_NAME) <<  " OMX_EventCmdComplete";					break;
+		case OMX_EventError:						ofLogVerbose(LOG_NAME) <<  " OMX_EventError";						break;
+		case OMX_EventMark:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMark";						break;
+		case OMX_EventPortSettingsChanged:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortSettingsChanged";			break;
+		case OMX_EventBufferFlag:					ofLogVerbose(LOG_NAME) <<  " OMX_EventBufferFlag";					break;
+		case OMX_EventResourcesAcquired:			ofLogVerbose(LOG_NAME) <<  " OMX_EventResourcesAcquired";			break;
+		case OMX_EventComponentResumed:				ofLogVerbose(LOG_NAME) <<  " OMX_EventComponentResumed";			break;
+		case OMX_EventDynamicResourcesAvailable:	ofLogVerbose(LOG_NAME) <<  " OMX_EventDynamicResourcesAvailable";	break;
+		case OMX_EventPortFormatDetected:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortFormatDetected";			break;
+		case OMX_EventKhronosExtensions:			ofLogVerbose(LOG_NAME) <<  " OMX_EventKhronosExtensions";			break;
+		case OMX_EventVendorStartUnused:			ofLogVerbose(LOG_NAME) <<  " OMX_EventVendorStartUnused";			break;
+		case OMX_EventMax:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMax";							break;
+		case OMX_EventParamOrConfigChanged:
+		{
+			ofLogVerbose(LOG_NAME) <<  " OMX_EventParamOrConfigChanged";
+			
+		}			
+		default:									ofLogVerbose(LOG_NAME) <<	"DEFAULT";								break;
+	}
+	return OMX_ErrorNone;
+}
+
 
 OMX_ERRORTYPE ofxOMXVideoGrabber::cameraEventHandlerCallback(OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData)
 {
@@ -625,40 +718,69 @@ void ofxOMXVideoGrabber::onCameraEventParamOrConfigChanged()
 		ofLog(OF_LOG_ERROR,			"render OMX_SendCommand OMX_StateIdle FAIL error: 0x%08x", error);
 	}
 	
-	error = OMX_SetupTunnel(camera, CAMERA_OUTPUT_PORT, render, EGL_RENDER_INPUT_PORT);
+	error = OMX_SetupTunnel(camera, CAMERA_OUTPUT_PORT, splitter, SPLITTER_INPUT_PORT);
 	if (error == OMX_ErrorNone) 
 	{
-		ofLogVerbose(LOG_NAME) <<	"render OMX_SetupTunnel PASS";
+		ofLogVerbose(LOG_NAME) <<	"camera->splitter OMX_SetupTunnel PASS";
 	}else 
 	{
-		ofLog(OF_LOG_ERROR,			"render OMX_SetupTunnel FAIL error: 0x%08x", error);
+		ofLog(OF_LOG_ERROR,			"camera->splitter OMX_SetupTunnel FAIL error: 0x%08x", error);
+	}
+	
+	error = OMX_SetupTunnel(splitter, SPLITTER_OUTPUT_PORT, render, EGL_RENDER_INPUT_PORT);
+	if (error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"splitter->render OMX_SetupTunnel PASS";
+	}else 
+	{
+		ofLog(OF_LOG_ERROR,			"splitter->render OMX_SetupTunnel FAIL error: 0x%08x", error);
+	}
+	
+	
+	error = OMX_SendCommand(splitter, OMX_CommandPortEnable, SPLITTER_INPUT_PORT, NULL);
+	if (error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"splitter SPLITTER_INPUT_PORT OMX_SendCommand OMX_CommandPortEnable PASS";
+	}else 
+	{
+		ofLog(OF_LOG_ERROR,			"splitter SPLITTER_INPUT_PORT OMX_SendCommand OMX_CommandPortEnable FAIL error: 0x%08x", error);
+	}
+	
+	error = OMX_SendCommand(splitter, OMX_CommandPortEnable, SPLITTER_OUTPUT_PORT, NULL);
+	if (error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"splitter SPLITTER_OUTPUT_PORT OMX_SendCommand OMX_CommandPortEnable PASS";
+	}else 
+	{
+		ofLog(OF_LOG_ERROR,			"splitter SPLITTER_OUTPUT_PORT OMX_SendCommand OMX_CommandPortEnable FAIL error: 0x%08x", error);
 	}
 	
 	error = OMX_SendCommand(camera, OMX_CommandPortEnable, CAMERA_OUTPUT_PORT, NULL);
 	if (error == OMX_ErrorNone) 
 	{
-		ofLogVerbose(LOG_NAME) <<	"camera OMX_SendCommand OMX_CommandPortEnable PASS";
+		ofLogVerbose(LOG_NAME) <<	"camera CAMERA_OUTPUT_PORT OMX_SendCommand OMX_CommandPortEnable PASS";
 	}else 
 	{
-		ofLog(OF_LOG_ERROR,			"camera OMX_SendCommand OMX_CommandPortEnable FAIL error: 0x%08x", error);
+		ofLog(OF_LOG_ERROR,			"camera CAMERA_OUTPUT_PORT OMX_SendCommand OMX_CommandPortEnable FAIL error: 0x%08x", error);
 	}
+	
 	
 	error = OMX_SendCommand(render, OMX_CommandPortEnable, EGL_RENDER_OUTPUT_PORT, NULL);
 	if (error == OMX_ErrorNone) 
 	{
-		ofLogVerbose(LOG_NAME) <<	"render OMX_SendCommand OMX_CommandPortEnable PASS";
+		ofLogVerbose(LOG_NAME) <<	"render EGL_RENDER_OUTPUT_PORT OMX_SendCommand OMX_CommandPortEnable PASS";
 	}else 
 	{
-		ofLog(OF_LOG_ERROR,			"render OMX_SendCommand OMX_CommandPortEnable FAIL error: 0x%08x", error);
+		ofLog(OF_LOG_ERROR,			"render EGL_RENDER_OUTPUT_PORT OMX_SendCommand OMX_CommandPortEnable FAIL error: 0x%08x", error);
 	}
 	
 	error = OMX_SendCommand(render, OMX_CommandPortEnable, EGL_RENDER_INPUT_PORT, NULL);
 	if (error == OMX_ErrorNone) 
 	{
-		ofLogVerbose(LOG_NAME) <<	"render OMX_SendCommand EGL_RENDER_INPUT_PORT OMX_CommandPortEnable PASS";
+		ofLogVerbose(LOG_NAME) <<	"render EGL_RENDER_INPUT_PORT OMX_SendCommand EGL_RENDER_INPUT_PORT OMX_CommandPortEnable PASS";
 	}else 
 	{
-		ofLog(OF_LOG_ERROR,			"render OMX_SendCommand EGL_RENDER_INPUT_PORT OMX_CommandPortEnable FAIL error: 0x%08x", error);
+		ofLog(OF_LOG_ERROR,			"render EGL_RENDER_INPUT_PORT OMX_SendCommand EGL_RENDER_INPUT_PORT OMX_CommandPortEnable FAIL error: 0x%08x", error);
 	}
 	
 	error = OMX_UseEGLImage(render, &eglBuffer, EGL_RENDER_OUTPUT_PORT, this, eglImage);
