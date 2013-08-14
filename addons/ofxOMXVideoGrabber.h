@@ -25,7 +25,7 @@ public:
 
 	void setup(int videoWidth, int videoHeight, int framerate);
 	void draw();
-	void close();
+	//void close();
 	void applyImageFilter(OMX_IMAGEFILTERTYPE imageFilter);
 	ofTexture& getTextureReference();
 	
