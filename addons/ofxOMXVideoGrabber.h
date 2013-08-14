@@ -35,10 +35,13 @@ public:
 	OMX_HANDLETYPE camera;
 	OMX_HANDLETYPE render;
 	OMX_HANDLETYPE splitter;
+	OMX_HANDLETYPE mediaWriter;
+	
 	
 	static OMX_ERRORTYPE cameraEventHandlerCallback(OMX_HANDLETYPE hComponent, OMX_PTR pAppData,  OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData);
 	
 	static OMX_ERRORTYPE splitterEventHandlerCallback(OMX_HANDLETYPE hComponent, OMX_PTR pAppData,  OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData);
+	static OMX_ERRORTYPE mediaWriterEventHandlerCallback(OMX_HANDLETYPE hComponent, OMX_PTR pAppData,  OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData);
 
 	
 	
@@ -81,7 +84,7 @@ public:
 	void setExposureMode(OMX_EXPOSURECONTROLTYPE exposureMode);
 
 	void setWhiteBalance(OMX_WHITEBALCONTROLTYPE controlType);
-	void setColorEnhancement(bool doColorEnhance);
+	void setColorEnhancement(bool doColorEnhance, int U=128, int V=128);
 	void setLEDStatus(bool status);
 	
 };

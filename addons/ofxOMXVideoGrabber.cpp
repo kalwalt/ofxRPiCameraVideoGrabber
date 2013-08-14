@@ -23,6 +23,8 @@ memset(&(a), 0, sizeof(a)); \
 #define SPLITTER_OUTPUT_PORT	251
 #define SPLITTER_OUTPUT_PORT2	252
 
+#define MEDIA_WRITER_INPUT_PORT 171
+
 string ofxOMXVideoGrabber::LOG_NAME = "ofxOMXVideoGrabber";
 
 ofxOMXVideoGrabber::ofxOMXVideoGrabber()
@@ -115,9 +117,9 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 		ofLog(OF_LOG_ERROR,			"camera OMX_GetParameter OMX_IndexParamPortDefinition FAIL error: 0x%08x", error);
 	}
 	
-	portdef.format.image.nFrameWidth = videoWidth;
-	portdef.format.image.nFrameHeight = videoHeight;
-	portdef.format.image.nStride = videoWidth;
+	portdef.format.video.nFrameWidth = videoWidth;
+	portdef.format.video.nFrameHeight = videoHeight;
+	portdef.format.video.nStride = videoWidth;
 	
 	error = OMX_SetParameter(camera, OMX_IndexParamPortDefinition, &portdef);
 	if(error == OMX_ErrorNone) 
@@ -180,9 +182,9 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 	{
 		ofLog(OF_LOG_ERROR,			"splitter OMX_GetParameter OMX_IndexParamPortDefinition FAIL error: 0x%08x", error);
 	}
-	splitterPortdef.format.image.nFrameWidth = videoWidth;
-	splitterPortdef.format.image.nFrameHeight = videoHeight;
-	splitterPortdef.format.image.nStride = videoWidth;
+	splitterPortdef.format.video.nFrameWidth = videoWidth;
+	splitterPortdef.format.video.nFrameHeight = videoHeight;
+	splitterPortdef.format.video.nStride = videoWidth;
 	
 	error = OMX_SetParameter(splitter, OMX_IndexParamPortDefinition, &splitterPortdef);
 	if(error == OMX_ErrorNone) 
@@ -201,9 +203,83 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 		ofLog(OF_LOG_ERROR,			"splitter OMX_SendCommand OMX_StateIdle FAIL error: 0x%08x", error);
 	}
 	
+	//MEDIA WRITER
 	
 	
-	setExposureMode(OMX_ExposureControlAuto);
+	string mediaWriterComponentName = "OMX.broadcom.write_media";
+	OMX_CALLBACKTYPE mediaWriterCallbacks;
+	mediaWriterCallbacks.EventHandler    = &ofxOMXVideoGrabber::mediaWriterEventHandlerCallback;
+	
+	error = OMX_GetHandle(&mediaWriter, (OMX_STRING)mediaWriterComponentName.c_str(), this , &mediaWriterCallbacks);
+	if(error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"mediaWriter OMX_GetHandle PASS";
+	}else
+	{
+		ofLog(OF_LOG_ERROR,			"mediaWriter OMX_GetHandle FAIL error: 0x%08x", error);
+	}
+	didDisable = disableAllPortsForComponent(&mediaWriter);
+	if(didDisable == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"mediaWriter didDisable PASS";
+	}else 
+	{
+		ofLog(OF_LOG_ERROR,			"mediaWriter didDisable FAIL error: 0x%08x", didDisable);
+	}
+	OMX_PARAM_PORTDEFINITIONTYPE mediaWriterPortdef;
+	OMX_INIT_STRUCTURE(mediaWriterPortdef);
+	mediaWriterPortdef.nPortIndex = MEDIA_WRITER_INPUT_PORT;
+	
+	
+	error = OMX_GetParameter(mediaWriter, OMX_IndexParamPortDefinition, &mediaWriterPortdef);
+	if(error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"mediaWriter OMX_GetParameter OMX_IndexParamPortDefinition PASS";
+	}else
+	{
+		ofLog(OF_LOG_ERROR,			"mediaWriter OMX_GetParameter OMX_IndexParamPortDefinition FAIL error: 0x%08x", error);
+	}
+	
+	OMX_PARAM_CONTENTURITYPE contentURIType;
+	OMX_INIT_STRUCTURE(contentURIType);
+	string outputFilePath = ofToDataPath(ofGetTimestampString()+".mp4", true);
+	
+	error = OMX_GetParameter(mediaWriter, OMX_IndexParamContentURI, &contentURIType);
+	if(error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) << "mediaWriter OMX_GetParameter OMX_IndexParamContentURI PASS";
+	}else
+	{
+		ofLog(OF_LOG_ERROR, "mediaWriter OMX_GetParameter OMX_IndexParamContentURI FAIL error: 0x%08x", error);
+	}
+	
+	const char* filename = (const char*)outputFilePath.c_str();
+	size_t uri_size = strlen(filename) + 1;
+	//size_t param_size = sizeof(contentURIType) + uri_size - 1;
+	
+	size_t param_size = sizeof(OMX_U32) + sizeof(OMX_VERSIONTYPE) + sizeof(OMX_U8) + uri_size - 1;
+	std::vector<char> memory(param_size);
+	
+	OMX_PARAM_CONTENTURITYPE * param = reinterpret_cast<OMX_PARAM_CONTENTURITYPE *>(&memory[0]);
+	param->nSize = param_size;
+	param->nVersion = contentURIType.nVersion;
+	memcpy(param->contentURI, filename, uri_size);
+	
+	
+	error = OMX_SetParameter(mediaWriter, OMX_IndexParamContentURI, param);
+	if (error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) << "mediaWriter OMX_SetParameter OMX_IndexParamContentURI PASS";
+	}else 
+	{
+		ofLog(OF_LOG_ERROR, "mediaWriter OMX_SetParameter OMX_IndexParamContentURI FAIL error: 0x%08x", error);
+	}
+	OMX_GetParameter(mediaWriter, OMX_IndexParamContentURI, &contentURIType);
+	ofLogVerbose() << "contentURI.contentURI: " << contentURIType.contentURI;
+	//prints contentURI.contentURI: /hom?{
+	
+	
+	setExposureMode(OMX_ExposureControlOff);//OMX_ExposureControlOff
 	setMeteringMode(OMX_MeteringModeAverage);
 	setSharpness(-50);
 	setContrast(-10);
@@ -403,8 +479,9 @@ void ofxOMXVideoGrabber::setWhiteBalance(OMX_WHITEBALCONTROLTYPE controlType)
 }
 
 
-void ofxOMXVideoGrabber::setColorEnhancement(bool doColorEnhance)
+void ofxOMXVideoGrabber::setColorEnhancement(bool doColorEnhance, int U, int V)//default: int U=128, int V=128
 {
+	//Practical values: 16-240, range: 0-255
 	OMX_ERRORTYPE error = OMX_ErrorNone;
 	
 	OMX_CONFIG_COLORENHANCEMENTTYPE color;
@@ -419,8 +496,8 @@ void ofxOMXVideoGrabber::setColorEnhancement(bool doColorEnhance)
 		color.bColorEnhancement = OMX_FALSE;
 	}
 	
-	color.nCustomizedU = 128;
-	color.nCustomizedV = 128;
+	color.nCustomizedU = U;
+	color.nCustomizedV = V;
 	error = OMX_SetConfig(camera, OMX_IndexConfigCommonColorEnhancement, &color);
 	if(error == OMX_ErrorNone) 
 	{
@@ -576,6 +653,35 @@ void ofxOMXVideoGrabber::generateEGLImage()
 }
 
 OMX_ERRORTYPE ofxOMXVideoGrabber::splitterEventHandlerCallback(OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData)
+{
+	ofLog(OF_LOG_VERBOSE, 
+		  "ofxOMXVideoGrabber::%s - eEvent(0x%x), nData1(0x%lx), nData2(0x%lx), pEventData(0x%p)\n",
+		  __func__, eEvent, nData1, nData2, pEventData);
+	switch (eEvent) 
+	{
+		case OMX_EventCmdComplete:					ofLogVerbose(LOG_NAME) <<  " OMX_EventCmdComplete";					break;
+		case OMX_EventError:						ofLogVerbose(LOG_NAME) <<  " OMX_EventError";						break;
+		case OMX_EventMark:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMark";						break;
+		case OMX_EventPortSettingsChanged:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortSettingsChanged";			break;
+		case OMX_EventBufferFlag:					ofLogVerbose(LOG_NAME) <<  " OMX_EventBufferFlag";					break;
+		case OMX_EventResourcesAcquired:			ofLogVerbose(LOG_NAME) <<  " OMX_EventResourcesAcquired";			break;
+		case OMX_EventComponentResumed:				ofLogVerbose(LOG_NAME) <<  " OMX_EventComponentResumed";			break;
+		case OMX_EventDynamicResourcesAvailable:	ofLogVerbose(LOG_NAME) <<  " OMX_EventDynamicResourcesAvailable";	break;
+		case OMX_EventPortFormatDetected:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortFormatDetected";			break;
+		case OMX_EventKhronosExtensions:			ofLogVerbose(LOG_NAME) <<  " OMX_EventKhronosExtensions";			break;
+		case OMX_EventVendorStartUnused:			ofLogVerbose(LOG_NAME) <<  " OMX_EventVendorStartUnused";			break;
+		case OMX_EventMax:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMax";							break;
+		case OMX_EventParamOrConfigChanged:
+		{
+			ofLogVerbose(LOG_NAME) <<  " OMX_EventParamOrConfigChanged";
+			
+		}			
+		default:									ofLogVerbose(LOG_NAME) <<	"DEFAULT";								break;
+	}
+	return OMX_ErrorNone;
+}
+
+OMX_ERRORTYPE ofxOMXVideoGrabber::mediaWriterEventHandlerCallback (OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData)
 {
 	ofLog(OF_LOG_VERBOSE, 
 		  "ofxOMXVideoGrabber::%s - eEvent(0x%x), nData1(0x%lx), nData2(0x%lx), pEventData(0x%p)\n",
