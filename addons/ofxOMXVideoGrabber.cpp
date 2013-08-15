@@ -240,33 +240,44 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 		ofLog(OF_LOG_ERROR,			"mediaWriter OMX_GetParameter OMX_IndexParamPortDefinition FAIL error: 0x%08x", error);
 	}
 	
-	OMX_PARAM_CONTENTURITYPE contentURIType;
-	OMX_INIT_STRUCTURE(contentURIType);
-	string outputFilePath = ofToDataPath(ofGetTimestampString()+".mp4", true);
+	OMX_PARAM_CONTENTURITYPE contentURITypeToCopy;
+	OMX_INIT_STRUCTURE(contentURITypeToCopy);
 	
-	error = OMX_GetParameter(mediaWriter, OMX_IndexParamContentURI, &contentURIType);
+	//char* filename = "/home/pi/test.mp4";
+	
+	string outputFilePath = ofToDataPath(ofGetTimestampString()+".mp4", true);
+	char * filename = new char[outputFilePath.size() + 1];
+	std::copy(outputFilePath.begin(), outputFilePath.end(), filename);
+	filename[outputFilePath.size()] = '\0'; // don't forget the terminating 0
+	
+	
+	
+	
+	
+	
+	size_t uri_size = strlen(filename) + 1;
+	size_t param_size = sizeof(OMX_PARAM_CONTENTURITYPE) + uri_size - 1;
+	
+	
+	std::vector<char> memory(param_size);
+	OMX_PARAM_CONTENTURITYPE * contentURIType = reinterpret_cast<OMX_PARAM_CONTENTURITYPE *>(&memory[0]);
+	
+	contentURIType->nSize = param_size;
+	contentURIType->nVersion = contentURITypeToCopy.nVersion;
+	memcpy(contentURIType->contentURI, filename, uri_size);
+	
+	
+	/*error = OMX_GetParameter(mediaWriter, OMX_IndexParamContentURI, contentURIType);
 	if(error == OMX_ErrorNone) 
 	{
 		ofLogVerbose(LOG_NAME) << "mediaWriter OMX_GetParameter OMX_IndexParamContentURI PASS";
 	}else
 	{
 		ofLog(OF_LOG_ERROR, "mediaWriter OMX_GetParameter OMX_IndexParamContentURI FAIL error: 0x%08x", error);
-	}
+	}*/
+
 	
-	const char* filename = (const char*)outputFilePath.c_str();
-	size_t uri_size = strlen(filename) + 1;
-	//size_t param_size = sizeof(contentURIType) + uri_size - 1;
-	
-	size_t param_size = sizeof(OMX_U32) + sizeof(OMX_VERSIONTYPE) + sizeof(OMX_U8) + uri_size - 1;
-	std::vector<char> memory(param_size);
-	
-	OMX_PARAM_CONTENTURITYPE * param = reinterpret_cast<OMX_PARAM_CONTENTURITYPE *>(&memory[0]);
-	param->nSize = param_size;
-	param->nVersion = contentURIType.nVersion;
-	memcpy(param->contentURI, filename, uri_size);
-	
-	
-	error = OMX_SetParameter(mediaWriter, OMX_IndexParamContentURI, param);
+	error = OMX_SetParameter(mediaWriter, OMX_IndexParamContentURI, contentURIType);
 	if (error == OMX_ErrorNone) 
 	{
 		ofLogVerbose(LOG_NAME) << "mediaWriter OMX_SetParameter OMX_IndexParamContentURI PASS";
@@ -274,9 +285,8 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 	{
 		ofLog(OF_LOG_ERROR, "mediaWriter OMX_SetParameter OMX_IndexParamContentURI FAIL error: 0x%08x", error);
 	}
-	OMX_GetParameter(mediaWriter, OMX_IndexParamContentURI, &contentURIType);
-	ofLogVerbose() << "contentURI.contentURI: " << contentURIType.contentURI;
-	//prints contentURI.contentURI: /hom?{
+	OMX_GetParameter(mediaWriter, OMX_IndexParamContentURI, contentURIType);
+	ofLogVerbose() << "contentURI.contentURI: " << contentURIType->contentURI;
 	
 	
 	setExposureMode(OMX_ExposureControlOff);//OMX_ExposureControlOff
