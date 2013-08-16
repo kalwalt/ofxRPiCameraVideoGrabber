@@ -9,7 +9,7 @@ void testApp::setup()
 	ofSetLogLevel(OF_LOG_VERBOSE);
 	consoleListener.setup(this);
 	shader.load("PostProcessing.vert", "PostProcessing.frag", "");
-	omxVideoGrabber.setup(1280, 720, 60);
+	omxVideoGrabber.setup(640, 480, 30);
 	
 	
 	

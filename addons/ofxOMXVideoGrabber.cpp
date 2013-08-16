@@ -23,7 +23,7 @@ memset(&(a), 0, sizeof(a)); \
 #define SPLITTER_OUTPUT_PORT	251
 #define SPLITTER_OUTPUT_PORT2	252
 
-#define MEDIA_WRITER_INPUT_PORT 171
+#define MEDIA_WRITER_INPUT_PORT 170
 
 string ofxOMXVideoGrabber::LOG_NAME = "ofxOMXVideoGrabber";
 
@@ -129,6 +129,12 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 	{
 		ofLog(OF_LOG_ERROR,			"camera OMX_SetParameter OMX_IndexParamPortDefinition FAIL error: 0x%08x", error);
 	}
+	
+	
+
+	
+	
+		
 	
 	
 	//Set the framerate 
@@ -242,22 +248,14 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 	
 	OMX_PARAM_CONTENTURITYPE contentURITypeToCopy;
 	OMX_INIT_STRUCTURE(contentURITypeToCopy);
-	
-	//char* filename = "/home/pi/test.mp4";
-	
+		
 	string outputFilePath = ofToDataPath(ofGetTimestampString()+".mp4", true);
 	char * filename = new char[outputFilePath.size() + 1];
 	std::copy(outputFilePath.begin(), outputFilePath.end(), filename);
 	filename[outputFilePath.size()] = '\0'; // don't forget the terminating 0
-	
-	
-	
-	
-	
-	
+
 	size_t uri_size = strlen(filename) + 1;
 	size_t param_size = sizeof(OMX_PARAM_CONTENTURITYPE) + uri_size - 1;
-	
 	
 	std::vector<char> memory(param_size);
 	OMX_PARAM_CONTENTURITYPE * contentURIType = reinterpret_cast<OMX_PARAM_CONTENTURITYPE *>(&memory[0]);
@@ -265,17 +263,6 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 	contentURIType->nSize = param_size;
 	contentURIType->nVersion = contentURITypeToCopy.nVersion;
 	memcpy(contentURIType->contentURI, filename, uri_size);
-	
-	
-	/*error = OMX_GetParameter(mediaWriter, OMX_IndexParamContentURI, contentURIType);
-	if(error == OMX_ErrorNone) 
-	{
-		ofLogVerbose(LOG_NAME) << "mediaWriter OMX_GetParameter OMX_IndexParamContentURI PASS";
-	}else
-	{
-		ofLog(OF_LOG_ERROR, "mediaWriter OMX_GetParameter OMX_IndexParamContentURI FAIL error: 0x%08x", error);
-	}*/
-
 	
 	error = OMX_SetParameter(mediaWriter, OMX_IndexParamContentURI, contentURIType);
 	if (error == OMX_ErrorNone) 
@@ -285,8 +272,43 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 	{
 		ofLog(OF_LOG_ERROR, "mediaWriter OMX_SetParameter OMX_IndexParamContentURI FAIL error: 0x%08x", error);
 	}
+	
 	OMX_GetParameter(mediaWriter, OMX_IndexParamContentURI, contentURIType);
 	ofLogVerbose() << "contentURI.contentURI: " << contentURIType->contentURI;
+	
+	
+	OMX_VIDEO_PARAM_PORTFORMATTYPE videoFormatType;
+	OMX_INIT_STRUCTURE(videoFormatType);
+	videoFormatType.nPortIndex = MEDIA_WRITER_INPUT_PORT;
+	
+	error = OMX_GetParameter(mediaWriter, OMX_IndexParamVideoPortFormat, &videoFormatType);
+	
+	if(error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"mediaWriter OMX_GetParameter OMX_IndexParamVideoPortFormat PASS";
+	}else
+	{
+		ofLog(OF_LOG_ERROR,			"mediaWriter OMX_GetParameter OMX_IndexParamVideoPortFormat FAIL error: 0x%08x", error);
+	}
+	if (videoFormatType.eCompressionFormat == OMX_VIDEO_CodingUnused) 
+	{
+		ofLogVerbose() << "OMX_VIDEO_CodingUnused                     |";
+	}else 
+	{
+		ofLogVerbose() << "videoFormatType.CompressionFormat: " << videoFormatType.eCompressionFormat;
+		
+	}
+	
+	
+	
+	error = OMX_SendCommand(mediaWriter, OMX_CommandStateSet, OMX_StateIdle, NULL);
+	if (error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"mediaWriter OMX_SendCommand OMX_StateIdle PASS";
+	}else 
+	{
+		ofLog(OF_LOG_ERROR,			"mediaWriter OMX_SendCommand OMX_StateIdle FAIL error: 0x%08x", error);
+	}
 	
 	
 	setExposureMode(OMX_ExposureControlOff);//OMX_ExposureControlOff
@@ -300,8 +322,6 @@ void ofxOMXVideoGrabber::setup(int videoWidth=1280, int videoHeight=720, int fra
 	applyImageFilter(OMX_ImageFilterNone);
 	setColorEnhancement(false);	 
 	setLEDStatus(false);
-	
-	
 
 }
 
@@ -324,6 +344,7 @@ void ofxOMXVideoGrabber::setExposureMode(OMX_EXPOSURECONTROLTYPE exposureMode)
 		ofLog(OF_LOG_ERROR,			"camera OMX_SetConfig OMX_IndexConfigCommonExposure FAIL error: 0x%08x", error);
 	}
 }
+
 void ofxOMXVideoGrabber::setMeteringMode(OMX_METERINGTYPE meteringType)
 {
 	OMX_ERRORTYPE error = OMX_ErrorNone;
@@ -664,23 +685,28 @@ void ofxOMXVideoGrabber::generateEGLImage()
 
 OMX_ERRORTYPE ofxOMXVideoGrabber::splitterEventHandlerCallback(OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData)
 {
-	ofLog(OF_LOG_VERBOSE, 
+	/*ofLog(OF_LOG_VERBOSE, 
 		  "ofxOMXVideoGrabber::%s - eEvent(0x%x), nData1(0x%lx), nData2(0x%lx), pEventData(0x%p)\n",
-		  __func__, eEvent, nData1, nData2, pEventData);
+		  __func__, eEvent, nData1, nData2, pEventData);*/
 	switch (eEvent) 
 	{
-		case OMX_EventCmdComplete:					ofLogVerbose(LOG_NAME) <<  " OMX_EventCmdComplete";					break;
-		case OMX_EventError:						ofLogVerbose(LOG_NAME) <<  " OMX_EventError";						break;
-		case OMX_EventMark:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMark";						break;
-		case OMX_EventPortSettingsChanged:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortSettingsChanged";			break;
-		case OMX_EventBufferFlag:					ofLogVerbose(LOG_NAME) <<  " OMX_EventBufferFlag";					break;
-		case OMX_EventResourcesAcquired:			ofLogVerbose(LOG_NAME) <<  " OMX_EventResourcesAcquired";			break;
-		case OMX_EventComponentResumed:				ofLogVerbose(LOG_NAME) <<  " OMX_EventComponentResumed";			break;
-		case OMX_EventDynamicResourcesAvailable:	ofLogVerbose(LOG_NAME) <<  " OMX_EventDynamicResourcesAvailable";	break;
-		case OMX_EventPortFormatDetected:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortFormatDetected";			break;
-		case OMX_EventKhronosExtensions:			ofLogVerbose(LOG_NAME) <<  " OMX_EventKhronosExtensions";			break;
-		case OMX_EventVendorStartUnused:			ofLogVerbose(LOG_NAME) <<  " OMX_EventVendorStartUnused";			break;
-		case OMX_EventMax:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMax";							break;
+		case OMX_EventCmdComplete:					ofLogVerbose(__func__) <<  " OMX_EventCmdComplete";					break;
+		case OMX_EventError:						
+		{
+			ofLogVerbose(__func__) <<  "OMX_EventError";
+			ofLog(OF_LOG_ERROR, "error: 0x%08x", nData1);
+			break;
+		}
+		case OMX_EventMark:							ofLogVerbose(__func__) <<  " OMX_EventMark";						break;
+		case OMX_EventPortSettingsChanged:			ofLogVerbose(__func__) <<  " OMX_EventPortSettingsChanged";			break;
+		case OMX_EventBufferFlag:					ofLogVerbose(__func__) <<  " OMX_EventBufferFlag";					break;
+		case OMX_EventResourcesAcquired:			ofLogVerbose(__func__) <<  " OMX_EventResourcesAcquired";			break;
+		case OMX_EventComponentResumed:				ofLogVerbose(__func__) <<  " OMX_EventComponentResumed";			break;
+		case OMX_EventDynamicResourcesAvailable:	ofLogVerbose(__func__) <<  " OMX_EventDynamicResourcesAvailable";	break;
+		case OMX_EventPortFormatDetected:			ofLogVerbose(__func__) <<  " OMX_EventPortFormatDetected";			break;
+		case OMX_EventKhronosExtensions:			ofLogVerbose(__func__) <<  " OMX_EventKhronosExtensions";			break;
+		case OMX_EventVendorStartUnused:			ofLogVerbose(__func__) <<  " OMX_EventVendorStartUnused";			break;
+		case OMX_EventMax:							ofLogVerbose(__func__) <<  " OMX_EventMax";							break;
 		case OMX_EventParamOrConfigChanged:
 		{
 			ofLogVerbose(LOG_NAME) <<  " OMX_EventParamOrConfigChanged";
@@ -693,26 +719,28 @@ OMX_ERRORTYPE ofxOMXVideoGrabber::splitterEventHandlerCallback(OMX_HANDLETYPE hC
 
 OMX_ERRORTYPE ofxOMXVideoGrabber::mediaWriterEventHandlerCallback (OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData)
 {
-	ofLog(OF_LOG_VERBOSE, 
-		  "ofxOMXVideoGrabber::%s - eEvent(0x%x), nData1(0x%lx), nData2(0x%lx), pEventData(0x%p)\n",
-		  __func__, eEvent, nData1, nData2, pEventData);
 	switch (eEvent) 
 	{
-		case OMX_EventCmdComplete:					ofLogVerbose(LOG_NAME) <<  " OMX_EventCmdComplete";					break;
-		case OMX_EventError:						ofLogVerbose(LOG_NAME) <<  " OMX_EventError";						break;
-		case OMX_EventMark:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMark";						break;
-		case OMX_EventPortSettingsChanged:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortSettingsChanged";			break;
-		case OMX_EventBufferFlag:					ofLogVerbose(LOG_NAME) <<  " OMX_EventBufferFlag";					break;
-		case OMX_EventResourcesAcquired:			ofLogVerbose(LOG_NAME) <<  " OMX_EventResourcesAcquired";			break;
-		case OMX_EventComponentResumed:				ofLogVerbose(LOG_NAME) <<  " OMX_EventComponentResumed";			break;
-		case OMX_EventDynamicResourcesAvailable:	ofLogVerbose(LOG_NAME) <<  " OMX_EventDynamicResourcesAvailable";	break;
-		case OMX_EventPortFormatDetected:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortFormatDetected";			break;
-		case OMX_EventKhronosExtensions:			ofLogVerbose(LOG_NAME) <<  " OMX_EventKhronosExtensions";			break;
-		case OMX_EventVendorStartUnused:			ofLogVerbose(LOG_NAME) <<  " OMX_EventVendorStartUnused";			break;
-		case OMX_EventMax:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMax";							break;
+		case OMX_EventCmdComplete:					ofLogVerbose(__func__) <<  " OMX_EventCmdComplete";					break;
+		case OMX_EventError:						
+		{
+			ofLogError(__func__) <<  "OMX_EventError";
+			ofLog(OF_LOG_ERROR, "error: 0x%08x", nData1);
+			break;
+		}
+		case OMX_EventMark:							ofLogVerbose(__func__) <<  " OMX_EventMark";						break;
+		case OMX_EventPortSettingsChanged:			ofLogVerbose(__func__) <<  " OMX_EventPortSettingsChanged";			break;
+		case OMX_EventBufferFlag:					ofLogVerbose(__func__) <<  " OMX_EventBufferFlag";					break;
+		case OMX_EventResourcesAcquired:			ofLogVerbose(__func__) <<  " OMX_EventResourcesAcquired";			break;
+		case OMX_EventComponentResumed:				ofLogVerbose(__func__) <<  " OMX_EventComponentResumed";			break;
+		case OMX_EventDynamicResourcesAvailable:	ofLogVerbose(__func__) <<  " OMX_EventDynamicResourcesAvailable";	break;
+		case OMX_EventPortFormatDetected:			ofLogVerbose(__func__) <<  " OMX_EventPortFormatDetected";			break;
+		case OMX_EventKhronosExtensions:			ofLogVerbose(__func__) <<  " OMX_EventKhronosExtensions";			break;
+		case OMX_EventVendorStartUnused:			ofLogVerbose(__func__) <<  " OMX_EventVendorStartUnused";			break;
+		case OMX_EventMax:							ofLogVerbose(__func__) <<  " OMX_EventMax";							break;
 		case OMX_EventParamOrConfigChanged:
 		{
-			ofLogVerbose(LOG_NAME) <<  " OMX_EventParamOrConfigChanged";
+			ofLogVerbose(__func__) <<  " OMX_EventParamOrConfigChanged";
 			
 		}			
 		default:									ofLogVerbose(LOG_NAME) <<	"DEFAULT";								break;
@@ -723,23 +751,25 @@ OMX_ERRORTYPE ofxOMXVideoGrabber::mediaWriterEventHandlerCallback (OMX_HANDLETYP
 
 OMX_ERRORTYPE ofxOMXVideoGrabber::cameraEventHandlerCallback(OMX_HANDLETYPE hComponent, OMX_PTR pAppData, OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2, OMX_PTR pEventData)
 {
-	ofLog(OF_LOG_VERBOSE, 
-		  "ofxOMXVideoGrabber::%s - eEvent(0x%x), nData1(0x%lx), nData2(0x%lx), pEventData(0x%p)\n",
-		  __func__, eEvent, nData1, nData2, pEventData);
 	switch (eEvent) 
 	{
-		case OMX_EventCmdComplete:					ofLogVerbose(LOG_NAME) <<  " OMX_EventCmdComplete";					break;
-		case OMX_EventError:						ofLogVerbose(LOG_NAME) <<  " OMX_EventError";						break;
-		case OMX_EventMark:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMark";						break;
-		case OMX_EventPortSettingsChanged:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortSettingsChanged";			break;
-		case OMX_EventBufferFlag:					ofLogVerbose(LOG_NAME) <<  " OMX_EventBufferFlag";					break;
-		case OMX_EventResourcesAcquired:			ofLogVerbose(LOG_NAME) <<  " OMX_EventResourcesAcquired";			break;
-		case OMX_EventComponentResumed:				ofLogVerbose(LOG_NAME) <<  " OMX_EventComponentResumed";			break;
-		case OMX_EventDynamicResourcesAvailable:	ofLogVerbose(LOG_NAME) <<  " OMX_EventDynamicResourcesAvailable";	break;
-		case OMX_EventPortFormatDetected:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortFormatDetected";			break;
-		case OMX_EventKhronosExtensions:			ofLogVerbose(LOG_NAME) <<  " OMX_EventKhronosExtensions";			break;
-		case OMX_EventVendorStartUnused:			ofLogVerbose(LOG_NAME) <<  " OMX_EventVendorStartUnused";			break;
-		case OMX_EventMax:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMax";							break;
+		case OMX_EventCmdComplete:					ofLogVerbose(__func__) <<  " OMX_EventCmdComplete";					break;
+		case OMX_EventError:						
+		{
+			ofLogError(__func__) <<  "OMX_EventError";
+			ofLog(OF_LOG_ERROR, "error: 0x%08x", nData1);
+			break;
+		}
+		case OMX_EventMark:							ofLogVerbose(__func__) <<  " OMX_EventMark";						break;
+		case OMX_EventPortSettingsChanged:			ofLogVerbose(__func__) <<  " OMX_EventPortSettingsChanged";			break;
+		case OMX_EventBufferFlag:					ofLogVerbose(__func__) <<  " OMX_EventBufferFlag";					break;
+		case OMX_EventResourcesAcquired:			ofLogVerbose(__func__) <<  " OMX_EventResourcesAcquired";			break;
+		case OMX_EventComponentResumed:				ofLogVerbose(__func__) <<  " OMX_EventComponentResumed";			break;
+		case OMX_EventDynamicResourcesAvailable:	ofLogVerbose(__func__) <<  " OMX_EventDynamicResourcesAvailable";	break;
+		case OMX_EventPortFormatDetected:			ofLogVerbose(__func__) <<  " OMX_EventPortFormatDetected";			break;
+		case OMX_EventKhronosExtensions:			ofLogVerbose(__func__) <<  " OMX_EventKhronosExtensions";			break;
+		case OMX_EventVendorStartUnused:			ofLogVerbose(__func__) <<  " OMX_EventVendorStartUnused";			break;
+		case OMX_EventMax:							ofLogVerbose(__func__) <<  " OMX_EventMax";							break;
 		case OMX_EventParamOrConfigChanged:
 		{
 			ofLogVerbose(LOG_NAME) <<  " OMX_EventParamOrConfigChanged";
@@ -757,20 +787,25 @@ OMX_ERRORTYPE ofxOMXVideoGrabber::renderEventHandlerCallback(OMX_HANDLETYPE hCom
 
 	switch (eEvent) 
 	{
-		case OMX_EventCmdComplete:					ofLogVerbose(LOG_NAME) <<  " OMX_EventCmdComplete";					break;
-		case OMX_EventError:						ofLogVerbose(LOG_NAME) <<  " OMX_EventError";						break;
-		case OMX_EventMark:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMark";						break;
-		case OMX_EventPortSettingsChanged:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortSettingsChanged";			break;
-		case OMX_EventBufferFlag:					ofLogVerbose(LOG_NAME) <<  " OMX_EventBufferFlag";					break;
-		case OMX_EventResourcesAcquired:			ofLogVerbose(LOG_NAME) <<  " OMX_EventResourcesAcquired";			break;
-		case OMX_EventComponentResumed:				ofLogVerbose(LOG_NAME) <<  " OMX_EventComponentResumed";			break;
-		case OMX_EventDynamicResourcesAvailable:	ofLogVerbose(LOG_NAME) <<  " OMX_EventDynamicResourcesAvailable";	break;
-		case OMX_EventPortFormatDetected:			ofLogVerbose(LOG_NAME) <<  " OMX_EventPortFormatDetected";			break;
-		case OMX_EventKhronosExtensions:			ofLogVerbose(LOG_NAME) <<  " OMX_EventKhronosExtensions";			break;
-		case OMX_EventVendorStartUnused:			ofLogVerbose(LOG_NAME) <<  " OMX_EventVendorStartUnused";			break;
-		case OMX_EventMax:							ofLogVerbose(LOG_NAME) <<  " OMX_EventMax";							break;
-		case OMX_EventParamOrConfigChanged:			ofLogVerbose(LOG_NAME) <<  " OMX_EventParamOrConfigChanged";		break;		
-		default:									ofLogVerbose(LOG_NAME) <<	"DEFAULT";								break;
+		case OMX_EventCmdComplete:					ofLogVerbose(__func__) <<  " OMX_EventCmdComplete";					break;
+		case OMX_EventError:						
+		{
+			ofLogError(__func__) <<  "OMX_EventError";
+			ofLog(OF_LOG_ERROR, "error: 0x%08x", nData1);
+			break;
+		}
+		case OMX_EventMark:							ofLogVerbose(__func__) <<  " OMX_EventMark";						break;
+		case OMX_EventPortSettingsChanged:			ofLogVerbose(__func__) <<  " OMX_EventPortSettingsChanged";			break;
+		case OMX_EventBufferFlag:					ofLogVerbose(__func__) <<  " OMX_EventBufferFlag";					break;
+		case OMX_EventResourcesAcquired:			ofLogVerbose(__func__) <<  " OMX_EventResourcesAcquired";			break;
+		case OMX_EventComponentResumed:				ofLogVerbose(__func__) <<  " OMX_EventComponentResumed";			break;
+		case OMX_EventDynamicResourcesAvailable:	ofLogVerbose(__func__) <<  " OMX_EventDynamicResourcesAvailable";	break;
+		case OMX_EventPortFormatDetected:			ofLogVerbose(__func__) <<  " OMX_EventPortFormatDetected";			break;
+		case OMX_EventKhronosExtensions:			ofLogVerbose(__func__) <<  " OMX_EventKhronosExtensions";			break;
+		case OMX_EventVendorStartUnused:			ofLogVerbose(__func__) <<  " OMX_EventVendorStartUnused";			break;
+		case OMX_EventMax:							ofLogVerbose(__func__) <<  " OMX_EventMax";							break;
+		case OMX_EventParamOrConfigChanged:			ofLogVerbose(__func__) <<  " OMX_EventParamOrConfigChanged";		break;		
+		default:									ofLogVerbose(__func__) <<	"DEFAULT";								break;
 	}
 		return OMX_ErrorNone;
 }
@@ -827,6 +862,10 @@ void ofxOMXVideoGrabber::onCameraEventParamOrConfigChanged()
 	error = OMX_GetHandle(&render, (OMX_STRING)componentName.c_str(), this , &renderCallbacks);
 	disableAllPortsForComponent(&render);
 	
+	
+	
+	
+	
 	error = OMX_SendCommand(render, OMX_CommandStateSet, OMX_StateIdle, NULL);
 	if (error == OMX_ErrorNone) 
 	{
@@ -846,15 +885,23 @@ void ofxOMXVideoGrabber::onCameraEventParamOrConfigChanged()
 		ofLog(OF_LOG_ERROR,			"camera->splitter OMX_SetupTunnel FAIL error: 0x%08x", error);
 	}
 	
-	error = OMX_SetupTunnel(splitter, SPLITTER_OUTPUT_PORT, render, EGL_RENDER_INPUT_PORT);
+	/*error = OMX_SetupTunnel(splitter, SPLITTER_OUTPUT_PORT, render, EGL_RENDER_INPUT_PORT);
 	if (error == OMX_ErrorNone) 
 	{
 		ofLogVerbose(LOG_NAME) <<	"splitter->render OMX_SetupTunnel PASS";
 	}else 
 	{
 		ofLog(OF_LOG_ERROR,			"splitter->render OMX_SetupTunnel FAIL error: 0x%08x", error);
-	}
+	}*/
 	
+	error = OMX_SetupTunnel(splitter, SPLITTER_OUTPUT_PORT2, mediaWriter, MEDIA_WRITER_INPUT_PORT);
+	if (error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"splitter->mediaWriter OMX_SetupTunnel PASS";
+	}else 
+	{
+		ofLog(OF_LOG_ERROR,			"splitter->mediaWriter OMX_SetupTunnel FAIL error: 0x%08x", error);
+	}
 	
 	error = OMX_SendCommand(splitter, OMX_CommandPortEnable, SPLITTER_INPUT_PORT, NULL);
 	if (error == OMX_ErrorNone) 
@@ -872,6 +919,15 @@ void ofxOMXVideoGrabber::onCameraEventParamOrConfigChanged()
 	}else 
 	{
 		ofLog(OF_LOG_ERROR,			"splitter SPLITTER_OUTPUT_PORT OMX_SendCommand OMX_CommandPortEnable FAIL error: 0x%08x", error);
+	}
+	
+	error = OMX_SendCommand(mediaWriter, OMX_CommandPortEnable, MEDIA_WRITER_INPUT_PORT, NULL);
+	if (error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"mediaWriter MEDIA_WRITER_INPUT_PORT OMX_SendCommand OMX_CommandPortEnable PASS";
+	}else 
+	{
+		ofLog(OF_LOG_ERROR,			"mediaWriter MEDIA_WRITER_INPUT_PORT OMX_SendCommand OMX_CommandPortEnable FAIL error: 0x%08x", error);
 	}
 	
 	error = OMX_SendCommand(splitter, OMX_CommandPortEnable, SPLITTER_OUTPUT_PORT2, NULL);
@@ -937,6 +993,14 @@ void ofxOMXVideoGrabber::onCameraEventParamOrConfigChanged()
 	}else 
 	{
 		ofLog(OF_LOG_ERROR,			"camera OMX_SendCommand OMX_StateExecuting FAIL error: 0x%08x", error);
+	}
+	error = OMX_SendCommand(mediaWriter, OMX_CommandStateSet, OMX_StateExecuting, NULL);
+	if (error == OMX_ErrorNone) 
+	{
+		ofLogVerbose(LOG_NAME) <<	"mediaWriter OMX_SendCommand OMX_StateExecuting PASS";
+	}else 
+	{
+		ofLog(OF_LOG_ERROR,			"mediaWriter OMX_SendCommand OMX_StateExecuting FAIL error: 0x%08x", error);
 	}
 	
 	error = OMX_FillThisBuffer(render, eglBuffer);
