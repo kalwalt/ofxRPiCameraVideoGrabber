@@ -17,16 +17,9 @@ class testApp : public ofBaseApp, public SSHKeyListener{
 		void keyPressed(int key);
 
 
-	ofShader shader;
-	
-	bool doShader;
-	bool isShaderLoaded;
 	void onCharacterReceived(SSHKeyListenerEventData& e);
 	ConsoleListener consoleListener;
 	ofxRPiCameraVideoGrabber videoGrabber;
 	
-	ImageFilterCollection filterCollection;
-	
-	bool doDrawInfo;
 };
 
